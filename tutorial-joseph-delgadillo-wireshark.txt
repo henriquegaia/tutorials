@@ -1,0 +1,436 @@
+##############################################
+# edit firewall rules to not respond to pings
+##############################################
+
+# linux
+
+iptables -I OUTPUT -p icmp -j DROP
+
+# windows
+
+Control Panel / 
+Windows firewall / 
+Advanced settings (on left side) / 
+Inbound rules / 
+New rule (on right side) :
+
+set "all programs" , 
+protocol "ICMPv4" , 
+ICMP settings click Customize button and 
+choose "specific ICMP types / echo request.  
+Choose "block".
+
+#############################################
+#	available interfaces
+#############################################
+
+tshark -D
+
+#############################################
+#	capture for 10s and save to file
+#############################################
+
+tshark -i 2 -a duration:10 -w C:\Users\h\Desktop\cap.pcap
+
+-i 		-> 	interface
+-a 	-> 	stop condition
+-w 	->		file to write to
+
+#############################################
+#	repeat process 3 times:
+#	-capture traffic on port 80 max 5 kb and 
+#	save to new file
+#############################################
+
+tshark -i 2 -f "port 80" -b filesize:5 -a files:3 -w C:\Users\h\Desktop\cap.pcap
+
+-b 	-> 	capture output
+-f 	->	capture filter
+
+#############################################
+#	read from capture file and filter
+# 	by fields (ex:ip)
+#############################################
+
+tshark -r C:\Users\h\Desktop\cap.pcap -T fields -e ip
+
+#############################################
+#	2:58:42 Networkcard modes
+#############################################
+
+master		used for access points 
+ad hoc 		peer to peer
+mesh 		uses computer b to reach computer c 
+repeater
+
+#############################################
+#	3:04:08 
+#	How to enable monitor mode pt1
+#############################################
+
+
+
+# check if network card (nc) can use 
+# monitor mode:
+# get my nc info: Start > Device Manager
+# compare it with: https://www.aircrack-ng.org/doku.php?id=compatibility_drivers
+
+# check mode on use
+iwconfig wlan0 | grep -i mode
+
+# set to monitor mode 
+# option 1:
+
+ifconfig wlan0 down
+iwconfig wlan0 mode monitor
+ifconfig wlan0 up
+
+#############################################
+#	3:15:27 
+#	How to enable monitor mode pt2
+#############################################
+
+# set to monitor mode 
+# option 2:
+
+airomon-ng check kill
+airomon-ng start wlan0 
+
+# confirm it's on monitor mode
+iwconfig wlan0 | grep -i mode
+
+#############################################
+#	3:26:33 
+#	Capture remote traffic
+#############################################
+
+# set to monitor mode 
+
+airomon-ng check kill
+airomon-ng start wlan0 
+
+# compare target channel and my interface
+
+airodump-ng wlan0mon
+iwlist wlan0mon channel
+
+# change interface channel if different
+
+iwconfig wlan0mon channel <1-13>
+
+airodump-ng wlan0mon -c <channel> --bssid <router.mac> --write out
+
+# should have generated 4 files:
+# out-01.cap
+# out-01.csv
+# out-01.kismet.csv
+# out-01.kismet.netxml
+
+# run wireshark with the results in out-01.cap
+
+wireshark out-01.cap
+
+#############################################
+#	3:36:27 
+#	Decrypting wireless traffic
+#############################################
+
+wireshark out-01.cap
+
+# select a packet (why??, i think is unnecessary)
+# go to edit > preferences > protocols > 
+# search for 'IEEE 802.11' > 
+# check 'enable decryption'
+# edit
+# +
+# new -> 	key type: 	wpa-pwd
+#			key: 		<wireless-password>:<network-name/ssid>
+						ex: 123:NOS-52E0
+# confirm and exit dialog
+
+# confirm that at least some packets 
+# have been decrypted
+
+#############################################
+#	3:46:42 
+#	Formatting output to a CSV file
+#############################################
+
+# example 1
+tshark -r out.pcap -T fields -e frame.number -e ip.src -e ip.dst -e tcp.dstport -E header=y -E separator=, -E quote=d -E occurrence=f > cap.csv
+
+# example 2
+tshark -r C:\Users\h\Desktop\cap.pcap -T fields -e frame.number -e ip.src -e ip.dst -e tcp.dstport -E header=y -E separator=, -E quote=d -E occurrence=f > C:\Users\h\Desktop\cap.csv
+
+# where:
+# occurrence: 	f (first: start from the first packet)
+# quote: 		??
+
+# !! ALERT !!
+# On excel: all the data is displayed in a single column
+
+# TODO: test on linux spreadsheet
+
+#############################################
+#	3:55:47 
+#	Exporting packet contents
+#############################################
+
+# start capture
+# open a site with live stream ( ex: news site)
+# filter: 	' ip.addr == <router.ip> && http '
+
+# select a packet 
+	> media type 
+	> media type: video ...
+	> rigth click
+	> export packet bytes
+	> save it
+
+# open vlc player with the saved file
+
+#############################################
+#	4:04:45 
+#	Wireshark and nmap pt1
+#############################################
+
+** start here **
+
+# filter: ip.src == <my.ip> && ip.dst == <target.ip>
+
+nmap <target.ip> -vv
+
+# wait for nmap to stop ...
+
+# on the bottom of the wireshark window, 
+# check the values for 'packets' and 
+# 'displayed'. If the values are very high ,
+# (
+#	example: 
+#	packets: 	1500
+#	displayed: 	1200 
+# )
+# it's likely that the network admin
+# of the target realizes there was
+# a scan in progress.
+# so, nmap needs to send less packets.
+
+# Experiment 1 to reduce number of packets sent:
+# get the os
+# result: worst
+#	packets: 	1700
+#	displayed: 	1600 
+
+nmap -O <target.ip> -vv
+
+#############################################
+#	4:15:40
+#	Wireshark and nmap pt2
+#############################################
+
+# Experiment 2 to reduce number of packets sent:
+# omit host discovery and assume host is online
+# result: bad
+#	packets: 	1600
+#	displayed: 	1500
+
+nmap -Pn <target.ip> -vv
+
+# Experiment 3 to reduce number of packets sent:
+# detail what ports to scan
+# result: great
+#	packets: 	60
+#	displayed: 	1-3
+
+nmap <target.ip> -p 80 -vv
+nmap <target.ip> -p 22 -Pn -vv
+nmap <target.ip> -p 22,80 -Pn -vv
+
+#############################################
+#	4:23:20 
+#	SSH tunneling to Wireshark pt1
+#############################################
+
+# talk about:
+# goal: capture traffic on a machine in a 
+# 	different network
+
+# talk about:
+# install ssh
+
+# talk about:
+# install tcpdump (to be installed on the target 
+#	machine)
+
+# talk about:
+# configure wireshark with a named pipe to
+#	filter info
+
+# talk about:
+# configure ssh on target machine for root
+#	login
+
+#############################################
+#	4:29:31
+#	SSH tunneling to Wireshark pt2
+#############################################
+
+apt-get install openssh.x86_64
+
+# !!!
+# next instructions are on a different linux vm 
+# (target?)
+# !!!
+
+locate sshd_config
+
+nano sshd_config
+
+# Uncomment:
+PermitRootLogin yes
+
+# save and exit file edition
+
+service sshd restart
+
+apt-get install tcpdump
+
+#############################################
+#	4:38:05
+#	SSH tunneling to Wireshark pt3
+#############################################
+
+# !!!
+# i think that the next instructions are on 
+# a different linux vm (target)
+# !!!
+
+# make a FIFO special file (a named pipe) 
+
+mkfifo packet_capture
+
+chmod 777 packet_capture
+
+# !!!
+# on the remote system (attacker)
+# !!!
+
+tcpdump -i <bssid.target> -w - | ssh <username.target>@[IP ADDRESS OR HOSTNAME] -c arcfour,blowfish-cbc -C -p [PORT] "cat - > /tmp/packet_capture"
+
+# where
+# -w 	->		write
+# -c 	-> 		ssh ciphers
+# -C 	-> 		compress all info to be transmitted
+
+# should be prompted to enter password
+
+# the results should be redirected to the file 'packet_capture'
+
+#############################################
+#	4:47:58
+#	SSH tunneling to Wireshark pt4
+#############################################
+
+# open wireshark
+# go to: 
+#	> Capture
+#	> Options
+#	> Manage Interfaces
+#	> Pipes
+#	> +
+#	> Browse to the file 'packet_capture' from 
+#		previous tutorial
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#############################################
+#	problems & solutions
+#############################################
+
+## 1: the npf driver isn't running
+
+solution-windows:
+	start cmd as admin
+	>sc start npf
+	
+	# sc: 	service controller
+	# npf: 	netgroup packet filter
+
+solution-linux:
+	???
+	
+	
+#############################################
+#	didn't work
+#############################################	
+	
+3:55:47 Exporting packet contents
+	
+	
+	
+	
+
+#############################################
+#	Time Stamps
+#############################################
+
+00:47 Introduction to Wireshark
+05:09 Basic networking terms and concepts
+19:36 OSI model: what are the different layers
+25:38 Wireshark installation & setup (Linux)
+39:53 Wireshark interface
+57:42 Deeper into the wireshark interface
+1:10:21 Protocol filters
+1:22:13 IP and port filtering
+1:29:45 HTTP packet analysis
+1:39:43 How credentials can be stolen over insecure networks
+1:44:58 Wireshark and Linux firewall interaction
+1:49:46 How to detect unauthorized traffic
+1:57:50 Introduction to Wireshark command line interface (CLI)
+2:04:55 First usage of CLI
+2:15:17 tshark file output
+2:26:58 tshark timer limits
+2:33:25 tshark splitting output files
+2:43:50 Display and capture filters
+2:51:12 Field separation in tshark
+2:58:42 Networkcard modes
+3:04:08 How to enable monitor mode pt1
+3:15:27 How to enable monitor mode pt2
+3:26:33 Capture remote traffic
+3:36:27 Decrypting wireless traffic
+3:46:42 Formatting output to a CSV file
+3:55:47 Exporting packet contents
+4:04:45 Wireshark and nmap pt1
+4:15:40 Wireshark and nmap pt2
+4:23:20 SSH tunneling to Wireshark pt1
+4:29:31 SSH tunneling to Wireshark pt2
+4:38:05 SSH tunneling to Wireshark pt3
+4:47:58 SSH tunneling to Wireshark pt4
+
+
+
+
+
+
+
+
+
+
+
+
+
